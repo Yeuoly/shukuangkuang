@@ -6,6 +6,8 @@ This is a tool can display the usage of per CPU in Linux just like the TaskManag
 ![image](https://github.com/Yeuoly/shukuangkuang/assets/45712896/0c4517ee-5668-4769-9db4-6683ce78ee9d)
 
 ## Usage
+You can compile it yourself or just use my [release](https://github.com/Yeuoly/shukuangkuang/releases)
+
 ### LogicalCPUMode (default)
 You can use it in logicalCpuMode, which will display all the usage of logical cpus
 ```bash
