@@ -1,0 +1,1 @@
+GOOS=linux GOARCH=386 go build -o build/shukuangkuang_linux_386 ./cmd/main/main.go

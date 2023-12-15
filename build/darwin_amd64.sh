@@ -1,0 +1,1 @@
+GOOS=darwin GOARCH=amd64 go build -o build/shukuangkuang_darwin_amd64 ./cmd/main/main.go

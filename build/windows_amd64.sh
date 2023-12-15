@@ -1,0 +1,1 @@
+GOOS=windows GOARCH=amd64 go build -o build/shukuangkuang_windows_amd64.exe ./cmd/main/main.go
