@@ -54,7 +54,7 @@ func (c *SingleCPU) Init() {
 func (c *LogicCPU) GetCPUStatus() ([][]float64, error) {
 	percent, err := cpu.Percent(time.Second, true)
 	// move all the data of per cpu to the right one step
-	for i := len(percent) - 1; i > 0; i-- {
+	for i := len(percent) - 1; i >= 0; i-- {
 		for j := MAX_CPU_COUNT - 1; j > 0; j-- {
 			c.percent[i][j] = c.percent[i][j-1]
 		}
