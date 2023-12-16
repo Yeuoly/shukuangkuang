@@ -3,7 +3,8 @@
 This is a tool can display the usage of per CPU in Linux just like the TaskManager in Windows
 
 ## Preview
-![image](https://github.com/Yeuoly/shukuangkuang/assets/45712896/0c4517ee-5668-4769-9db4-6683ce78ee9d)
+<img width="1701" alt="image" src="https://github.com/Yeuoly/shukuangkuang/assets/45712896/80423d18-c7d5-4309-9d20-6af7fb451a58">
+
 
 ## Usage
 You can compile it yourself or just use my [release](https://github.com/Yeuoly/shukuangkuang/releases)
