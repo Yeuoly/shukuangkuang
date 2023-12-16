@@ -54,7 +54,6 @@ func (c *Shukuangkuang) renderCpu() {
 
 		sparkline := widgets.NewSparkline()
 		sparkline.MaxVal = 100
-		sparkline.Title = fmt.Sprintf("CPU %d", i)
 		sparkline.LineColor = ui.ColorGreen
 		sparkline.TitleStyle.Fg = ui.ColorWhite
 		plots[i] = widgets.NewSparklineGroup(sparkline)

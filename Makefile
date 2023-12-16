@@ -14,7 +14,7 @@ run: $(SH_FILES)
 # Target to clean compiled files
 clean:
 	@echo "Cleaning compiled files in build folder"
-	@rm -f build/*
+	@rm -f build/shukuangkuang*
 
 # Phony targets to avoid conflicts with file names
 .PHONY: run clean
