@@ -1,6 +1,7 @@
 package internal
 
 type Shukuangkuang struct {
+	stop            chan struct{}
 	CPUStatusLoader CPUStatusLoader
 }
 

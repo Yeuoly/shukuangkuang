@@ -10,6 +10,11 @@ import (
 )
 
 func (c *Shukuangkuang) Run(args ShukuangkuangArgs) {
+	if c.stop != nil {
+		close(c.stop)
+	}
+	c.stop = make(chan struct{}, 1)
+
 	if args.LogicCoreMode {
 		c.CPUStatusLoader = NewCPUStatusLoader(true)
 	} else {
@@ -40,20 +45,20 @@ func (c *Shukuangkuang) renderCpu() {
 	// compute the count of rows and cols
 	cols := w / box_width
 
-	plots := make([]*widgets.Plot, count)
+	plots := make([]*widgets.SparklineGroup, count)
 
 	for i := 0; i < count; i++ {
 		// compute the position of each box
 		x := (i % cols) * box_width
 		y := (i / cols) * box_height
 
-		plots[i] = widgets.NewPlot()
-		plots[i].MaxVal = 100
-		plots[i].Title = fmt.Sprintf("CPU %d", i)
+		sparkline := widgets.NewSparkline()
+		sparkline.MaxVal = 100
+		sparkline.Title = fmt.Sprintf("CPU %d", i)
+		sparkline.LineColor = ui.ColorGreen
+		sparkline.TitleStyle.Fg = ui.ColorWhite
+		plots[i] = widgets.NewSparklineGroup(sparkline)
 		plots[i].SetRect(x, y, x+box_width, y+box_height)
-		plots[i].AxesColor = ui.ColorWhite
-		plots[i].LineColors = []ui.Color{ui.ColorGreen}
-		plots[i].TitleStyle.Fg = ui.ColorWhite
 	}
 
 	draw := func() {
@@ -62,8 +67,15 @@ func (c *Shukuangkuang) renderCpu() {
 			log.Fatalf("failed to get cpu status: %v", err)
 		}
 		for i := 0; i < count; i++ {
-			plots[i].Data = [][]float64{percent[i]}
+			plots[i].Sparklines[0].Data = percent[i]
 			plots[i].Title = fmt.Sprintf("%d - %.2f%%", i, percent[i][0])
+			if percent[i][0] > 80 {
+				plots[i].Sparklines[0].LineColor = ui.ColorRed
+			} else if percent[i][0] > 50 {
+				plots[i].Sparklines[0].LineColor = ui.ColorYellow
+			} else {
+				plots[i].Sparklines[0].LineColor = ui.ColorGreen
+			}
 		}
 
 		for i := 0; i < count; i++ {
@@ -71,19 +83,26 @@ func (c *Shukuangkuang) renderCpu() {
 		}
 	}
 
-	uiEvents := ui.PollEvents()
-	ticker := time.NewTicker(time.Second)
+	// cause PollEvents is not implemented in sync mode, so we need to use goroutine to avoid blocking, it's too slow
+	go func() {
+		uiEvents := ui.PollEvents()
+		for event := range uiEvents {
+			switch event.ID {
+			case "q", "<C-c>":
+				c.stop <- struct{}{}
+			}
+		}
+	}()
+
+	ticker := time.NewTicker(time.Millisecond * 1000)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
 			draw()
-		case e := <-uiEvents:
-			switch e.ID {
-			case "q", "<C-c>":
-				return
-			}
+		case <-c.stop:
+			return
 		}
 	}
 }
