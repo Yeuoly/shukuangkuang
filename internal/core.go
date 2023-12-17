@@ -3,6 +3,7 @@ package internal
 import (
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	ui "github.com/gizak/termui/v3"
@@ -10,27 +11,74 @@ import (
 )
 
 func (c *Shukuangkuang) Run(args ShukuangkuangArgs) {
-	if c.stop != nil {
-		close(c.stop)
-	}
-	c.stop = make(chan struct{}, 1)
-
 	if args.LogicCoreMode {
 		c.CPUStatusLoader = NewCPUStatusLoader(true)
 	} else {
 		c.CPUStatusLoader = NewCPUStatusLoader(false)
 	}
 
+	c.MemoryStatusLoader = NewMemoryStatusLoader()
+
 	c.CPUStatusLoader.Init()
+	c.MemoryStatusLoader.Init()
 
-	c.renderCpu()
-}
-
-func (c *Shukuangkuang) renderCpu() {
 	if err := ui.Init(); err != nil {
 		log.Fatalf("failed to initialize termui: %v", err)
 	}
-	defer ui.Close()
+
+	c.mode = MODE_CPU
+	c.switched = make(chan struct{}, 1)
+
+	c.event()
+	c.run()
+}
+
+func (c *Shukuangkuang) event() {
+	go func() {
+		uiEvents := ui.PollEvents()
+		for event := range uiEvents {
+			switch event.ID {
+			case "q", "<C-c>":
+				ui.Close()
+				os.Exit(0)
+			case "m":
+				c.mode = MODE_MEMORY
+				c.switched <- struct{}{}
+			case "c":
+				c.mode = MODE_CPU
+				c.switched <- struct{}{}
+			}
+		}
+	}()
+}
+
+func (c *Shukuangkuang) run() {
+	for {
+		switch c.mode {
+		case MODE_CPU:
+			c.renderCpu()
+		case MODE_MEMORY:
+			c.renderMemory()
+		case MODE_PROCESS:
+		}
+	}
+}
+
+func (c *Shukuangkuang) renderLoop(timeout time.Duration, draw func()) {
+	ticker := time.NewTicker(timeout)
+	defer ticker.Stop()
+	draw()
+	for {
+		select {
+		case <-ticker.C:
+			draw()
+		case <-c.switched:
+			return
+		}
+	}
+}
+
+func (c *Shukuangkuang) renderCpu() {
 	// get total width and height
 	w, h := ui.TerminalDimensions()
 	// compute the count of cpu cores
@@ -82,26 +130,78 @@ func (c *Shukuangkuang) renderCpu() {
 		}
 	}
 
-	// cause PollEvents is not implemented in sync mode, so we need to use goroutine to avoid blocking, it's too slow
-	go func() {
-		uiEvents := ui.PollEvents()
-		for event := range uiEvents {
-			switch event.ID {
-			case "q", "<C-c>":
-				c.stop <- struct{}{}
+	defer ui.Clear()
+
+	c.renderLoop(time.Second, draw)
+}
+
+func (c *Shukuangkuang) renderMemory() {
+	c.MemoryStatusLoader.LaunchGoRoutine()
+	defer c.MemoryStatusLoader.StopGoRoutine()
+	// top from [0, 5] showes the memory usage of the system
+	w, h := ui.TerminalDimensions()
+	totalMemoryBarHeight := 10
+	if h < totalMemoryBarHeight {
+		totalMemoryBarHeight = h
+	}
+	processBarHeight := h - totalMemoryBarHeight
+
+	sparkline := widgets.NewSparkline()
+	sparkline.MaxVal = 100
+	sparkline.LineColor = ui.ColorGreen
+	sparkline.TitleStyle.Fg = ui.ColorWhite
+	totalMemoryBar := widgets.NewSparklineGroup(sparkline)
+	totalMemoryBar.Title = "Memory Usage"
+	totalMemoryBar.SetRect(0, 0, w, totalMemoryBarHeight)
+
+	drawables := make([]ui.Drawable, 1)
+	drawables[0] = totalMemoryBar
+
+	if processBarHeight > 0 {
+		processTable := widgets.NewTable()
+		processTable.Title = "Process Usage"
+		processTable.SetRect(0, totalMemoryBarHeight, w, h)
+		processTable.Rows = [][]string{}
+		processTable.TextStyle = ui.NewStyle(ui.ColorWhite)
+		processTable.RowSeparator = false
+		drawables = append(drawables, processTable)
+	}
+
+	draw := func() {
+		usages, procs, err := c.MemoryStatusLoader.GetMemoryStatus()
+		if err != nil {
+			log.Fatalf("failed to get memory status: %v", err)
+		}
+
+		maxMemory, err := c.MemoryStatusLoader.GetMaxMemory()
+		if err != nil {
+			log.Fatalf("failed to get max memory: %v", err)
+		}
+
+		data := make([]float64, len(usages))
+		for i := 0; i < len(usages); i++ {
+			data[i] = float64(usages[i]) / float64(maxMemory) * 100
+		}
+
+		totalMemoryBar.Sparklines[0].Data = data
+		totalMemoryBar.Sparklines[0].Title = fmt.Sprintf("%v/%v", Bytes2Human(usages[0]), Bytes2Human(maxMemory))
+
+		if processBarHeight > 0 {
+			processTable := drawables[1].(*widgets.Table)
+			processTable.Rows = [][]string{
+				{"PID", "Name", "Usage"},
+			}
+			for i := 0; i < len(procs); i++ {
+				processTable.Rows = append(processTable.Rows, []string{fmt.Sprintf("%v", procs[i].Pid), procs[i].Name, fmt.Sprintf("%v", Bytes2Human(procs[i].MemoryUsage))})
 			}
 		}
-	}()
 
-	ticker := time.NewTicker(time.Millisecond * 1000)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			draw()
-		case <-c.stop:
-			return
+		for _, drawable := range drawables {
+			ui.Render(drawable)
 		}
 	}
+
+	defer ui.Clear()
+
+	c.renderLoop(time.Second, draw)
 }

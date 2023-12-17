@@ -5,6 +5,7 @@ go 1.20
 require github.com/gizak/termui/v3 v3.1.0
 
 require (
+	github.com/NVIDIA/go-nvml v0.12.0-1 // indirect
 	github.com/gizak/termui v3.1.0+incompatible // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/mattn/go-runewidth v0.0.2 // indirect
