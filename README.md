@@ -15,6 +15,7 @@ You can use it in logicalCpuMode, which will display all the usage of logical cp
 shukuangkuang
 ```
 
+
 ### SingleCPUMode
 You can also display the average usage off all cpus
 ```bash
